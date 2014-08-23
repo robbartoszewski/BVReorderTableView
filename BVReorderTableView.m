@@ -108,7 +108,9 @@
     
     // get out of here if the long press was not on a valid row or our table is empty
     if (rows == 0 || (gesture.state == UIGestureRecognizerStateBegan && indexPath == nil) ||
-        (gesture.state == UIGestureRecognizerStateEnded && self.currentLocationIndexPath == nil)) {
+        (gesture.state == UIGestureRecognizerStateEnded && self.currentLocationIndexPath == nil) ||
+        (gesture.state == UIGestureRecognizerStateBegan && [self.dataSource respondsToSelector:@selector(tableView:canMoveRowAtIndexPath:)] &&
+         indexPath && ![self.dataSource tableView:self canMoveRowAtIndexPath:indexPath])) {
         [self cancelGesture];
         return;
     }
