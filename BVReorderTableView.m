@@ -170,9 +170,7 @@
     else if (gesture.state == UIGestureRecognizerStateChanged) {
         // update position of the drag view
         // don't let it go past the top or the bottom too far
-        if (location.y >= 0 && location.y <= self.contentSize.height + 50) {
-            draggingView.center = CGPointMake(self.center.x, location.y);
-        }
+        [self setDraggingViewCenterYIfPossible:location.y];
         
         CGRect rect = self.bounds;
         // adjust rect for content inset as we will use it below for calculating scroll zones
@@ -264,6 +262,12 @@
 
     UILongPressGestureRecognizer *gesture = [timer.userInfo objectForKey:@"gesture"];
     CGPoint location  = [gesture locationInView:self];
+    NSIndexPath *indexPath = [self indexPathForRowAtPoint:location];
+    if ([self.dataSource respondsToSelector:@selector(tableView:canMoveRowAtIndexPath:)]) {
+        if (![self.dataSource tableView:self canMoveRowAtIndexPath:indexPath]) {
+            return;
+        }
+    }
     
     CGPoint currentOffset = self.contentOffset;
     CGPoint newOffset = CGPointMake(currentOffset.x, currentOffset.y + self.scrollRate);
@@ -278,11 +282,36 @@
     }
     [self setContentOffset:newOffset];
     
-    if (location.y >= 0 && location.y <= self.contentSize.height + 50) {
-        draggingView.center = CGPointMake(self.center.x, location.y);
-    }
+    [self setDraggingViewCenterYIfPossible:location.y];
     
     [self updateCurrentLocation:gesture];
+}
+
+- (void)setDraggingViewCenterYIfPossible:(CGFloat)centerY {
+    CGFloat correctedCenterY = centerY;
+    if([self.dataSource respondsToSelector:@selector(tableView:canMoveRowAtIndexPath:)]) {
+        CGFloat draggingViewOriginY = centerY - roundf(CGRectGetHeight(draggingView.frame) / 2);
+        NSIndexPath *originYIndexPath = [self indexPathForRowAtPoint:CGPointMake(self.center.x, draggingViewOriginY)];
+        if(originYIndexPath) {
+            if(![self.dataSource tableView:self canMoveRowAtIndexPath:originYIndexPath]) {
+                CGRect cellFrame = [self rectForRowAtIndexPath:originYIndexPath];
+                correctedCenterY = CGRectGetMaxY(cellFrame) + roundf(CGRectGetHeight(draggingView.frame) / 2);
+            }
+        }
+        CGFloat draggingViewBottomY = centerY + roundf(CGRectGetHeight(draggingView.frame) / 2);
+        NSIndexPath *bottomYIndexPath = [self indexPathForRowAtPoint:CGPointMake(self.center.x, draggingViewBottomY)];
+        if (bottomYIndexPath) {
+            if (![self.dataSource tableView:self canMoveRowAtIndexPath:bottomYIndexPath]) {
+                CGRect cellFrame = [self rectForRowAtIndexPath:bottomYIndexPath];
+                correctedCenterY = CGRectGetMinY(cellFrame) - roundf(CGRectGetHeight(draggingView.frame) / 2);
+            }
+        }
+    }
+    CGFloat minCenterY = roundf(CGRectGetHeight(draggingView.frame)/2);
+    CGFloat maxCenterY = self.contentSize.height + 50;
+    if (correctedCenterY >= minCenterY && correctedCenterY <= maxCenterY) {
+        draggingView.center = CGPointMake(self.center.x, correctedCenterY);
+    }
 }
 
 - (void)cancelGesture {
